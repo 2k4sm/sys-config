@@ -2,7 +2,13 @@
 
 # Function to detect package manager
 detect_package_manager() {
-    if command -v apt &>/dev/null; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        if command -v brew &>/dev/null; then
+            echo "brew"
+        else
+            echo "BREW_MISSING"
+        fi
+    elif command -v apt &>/dev/null; then
         echo "apt"
     elif command -v dnf &>/dev/null; then
         echo "dnf"
@@ -17,12 +23,30 @@ detect_package_manager() {
     fi
 }
 
+# Function to install Homebrew on macOS
+install_homebrew() {
+    echo "Homebrew not found. Installing Homebrew..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    
+    # Add Homebrew to PATH for Apple Silicon Macs
+    if [[ $(uname -m) == "arm64" ]]; then
+        echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    else
+        echo 'eval "$(/usr/local/bin/brew shellenv)"' >> ~/.zprofile
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+}
+
 # Function to install packages based on package manager
 install_package() {
     local package_manager=$1
     local package_name=$2
     
     case $package_manager in
+        "brew")
+            brew install "$package_name"
+            ;;
         "apt")
             sudo apt-get install -y "$package_name"
             ;;
@@ -59,6 +83,9 @@ get_package_name() {
             ;;
         "fastfetch")
             case $package_manager in
+                "brew")
+                    echo "fastfetch"
+                    ;;
                 "apt")
                     echo "fastfetch"
                     ;;
@@ -70,6 +97,25 @@ get_package_name() {
                     ;;
                 "zypper")
                     echo "fastfetch"
+                    ;;
+            esac
+            ;;
+        "golang")
+            case $package_manager in
+                "brew")
+                    echo "go"
+                    ;;
+                "apt")
+                    echo "golang"
+                    ;;
+                "dnf"|"yum")
+                    echo "golang"
+                    ;;
+                "pacman")
+                    echo "go"
+                    ;;
+                "zypper")
+                    echo "go"
                     ;;
             esac
             ;;
@@ -85,7 +131,11 @@ main() {
     
     # Detect package manager
     PKG_MANAGER=$(detect_package_manager)
-    if [ "$PKG_MANAGER" = "UNKNOWN" ]; then
+    
+    if [ "$PKG_MANAGER" = "BREW_MISSING" ]; then
+        install_homebrew
+        PKG_MANAGER="brew"
+    elif [ "$PKG_MANAGER" = "UNKNOWN" ]; then
         echo "Could not detect package manager. Exiting..."
         exit 1
     fi
@@ -94,6 +144,9 @@ main() {
     
     # Update package manager
     case $PKG_MANAGER in
+        "brew")
+            brew update
+            ;;
         "apt")
             sudo apt-get update
             ;;
@@ -146,25 +199,19 @@ main() {
     # Install Go if not present
     if ! command -v go &>/dev/null; then
         echo "Installing Go..."
-        case $PKG_MANAGER in
-            "apt")
-                sudo apt-get install -y golang
-                ;;
-            "dnf"|"yum")
-                sudo $PKG_MANAGER install -y golang
-                ;;
-            "pacman")
-                sudo pacman -S --noconfirm go
-                ;;
-            "zypper")
-                sudo zypper install -y go
-                ;;
-        esac
+        go_pkg=$(get_package_name "$PKG_MANAGER" "golang")
+        install_package "$PKG_MANAGER" "$go_pkg"
     fi
     
     # Set Zsh as default shell
     echo "Setting Zsh as default shell..."
-    chsh -s $(which zsh)
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS method
+        sudo chsh -s $(which zsh) $USER
+    else
+        # Linux method
+        chsh -s $(which zsh)
+    fi
     
     echo "Installation complete! Please log out and log back in to start using Zsh."
     echo "Don't forget to update the Git repository URL in the script before using it."
