@@ -110,13 +110,49 @@ source $ZSH/oh-my-zsh.sh
 
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#55679C"
 
-# bun completions
-[ -s "/home/sm2k4/.bun/_bun" ] && source "/home/sm2k4/.bun/_bun"
+# Homebrew setup for macOS (Apple Silicon and Intel)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    if [[ $(uname -m) == "arm64" ]]; then
+        # Apple Silicon
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    else
+        # Intel Mac
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+fi
 
-# bun
+# Bun setup
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
-export GPG_TTY=$(tty)
+
+# Bun completions
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
+
+# Rust/Cargo setup
+export PATH="$HOME/.cargo/bin:$PATH"
+
+# Go setup
 export GOPATH=$HOME/go
-export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
-alias zed="WAYLAND_DISPLAY='' zed "
+export PATH=$PATH:$GOPATH/bin
+
+# LLVM/Clang setup for macOS (if installed via Homebrew)
+if [[ "$OSTYPE" == "darwin"* ]] && command -v brew &>/dev/null; then
+    if [ -d "$(brew --prefix)/opt/llvm" ]; then
+        export PATH="$(brew --prefix)/opt/llvm/bin:$PATH"
+    fi
+fi
+
+# GPG TTY setup
+export GPG_TTY=$(tty)
+
+# macOS-specific aliases
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # Add any macOS-specific aliases here
+    # alias ls='ls -G'  # Example: colorized ls on macOS
+fi
+
+# Linux-specific aliases
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    # Zed editor fix for Wayland (Linux only)
+    alias zed="WAYLAND_DISPLAY='' zed"
+fi
